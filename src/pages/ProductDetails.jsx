@@ -1,184 +1,259 @@
-import React from 'react'
-import { createMemoryRouter, generatePath, useLocation } from 'react-router-dom';
-import 'bootstrap/dist/css/bootstrap.min.css';
-import { app } from '../firebase';
+import React from 'react';
+import { getAuth } from 'firebase/auth';
+import { getFirestore, collection, getDoc, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 import { useState, useEffect } from 'react';
-import { createSearchParams, Link, useNavigate } from 'react-router-dom';
-import {
-  getFirestore,
-  collection,
-  addDoc,
-  getDocs,
-  getDoc,
-  doc,
-  query,
-  where,
-  setDoc
-} from "firebase/firestore";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { async, map, RANDOM_FACTOR, uuidv4 } from '@firebase/util';
-import Sidebar from './Sidebar';
-import { getAuth } from "firebase/auth";
-import { Firestore } from 'firebase/firestore';
+import { useLocation } from 'react-router-dom';
+import CustomNavbar from './CustomNavbar';
+import Footer from './Footer';
 import Comment from './Comment';
-let pId;
-const firestore = getFirestore();
-const ProductDetails = () => {
-  let name, image, price, details, pid;
-  const Auth = getAuth();
-    const User = Auth.currentUser;
-    let cmtName = User.email;
-  const location = useLocation();
 
-  const storage = getStorage();
+const firestore = getFirestore();
+let pId;
+const ProductDetails = () => {
+  const location = useLocation();
   const [info, setInfo] = useState([]);
   const [showDiv, setShowDiv] = useState(false);
+  const [showBeforeDiv, setShowBeforeDiv] = useState(true);
+  const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [user, setUser] = useState(null);
+  const [comment, setComment] = useState('');
+
+
   const productId = location.state.name;
   pId = productId;
+
   useEffect(() => {
-    Fetchdata();
+    fetchData();
+    unsubscribe();
 
-    return () => {
-
-    };
+    return () => { };
   }, []);
-  const Fetchdata = async () => {
-    const querySnapshot = await getDoc(doc(firestore, "products", productId));
-    console.log("data = " + querySnapshot.data().name);
-    name = querySnapshot.data().name;
-    image = querySnapshot.data().image;
-    price = querySnapshot.data().price;
-    details = querySnapshot.data().details;
-    pid = querySnapshot.id;
-    console.log("pid = " + pid);
-    setInfo(querySnapshot.data());
-    console.log("in function = " + name + image + price)
-  }
-  console.log("out frame = " + name + image + price);
 
-  //const [,save] = useDatabasePush('comments')
-  const [comment, setComment] = useState('')
+  const unsubscribe = async () => {
+    try {
+      const auth = getAuth();
+      const user = auth.currentUser;
 
-  const bttnClick = async () => {
-    if(comment!=null)
-       setShowDiv(true);
+      if (user && user.email) {
+        setUser(user.email);
+
+        // Check if the user has already liked the post
+        const snap = await getDoc(doc(firestore, 'likes', pId, 'like', `${pId}-${user.email}`));
+        if (snap.data().size !== 0) {
+          setIsLiked(true);
+        }
+      } else {
+        setUser(null);
+        setIsLiked(false);
+      }
+    } catch (error) {
+      console.log('User', error);
+    }
+  };
+
+  const fetchData = async () => {
+    try {
+      const querySnapshot = await getDoc(doc(firestore, 'products', productId));
+      const data = querySnapshot.data();
+      setInfo(data);
+    } catch (error) {
+      console.log('Fetch data', error);
+    }
+  };
+
+  const handleCommentSubmit = async () => {
     const auth = getAuth();
-    let user = auth.currentUser;
-    console.log("pid = " + pId);
-    // The user object has basic properties such as display name, email, etc.
-    const displayName = user.displayName;
+    const user = auth.currentUser;
     const email = user.email;
-    console.log(comment);
-    const parentDocRef = doc(firestore, "comment", pId); // reference to the user1 document in the "users" collection
-    const subcollectionRef = collection(parentDocRef, "allComment"); // reference to the "messages" subcollection
+
+    const parentDocRef = doc(firestore, 'comment', pId);
+    const subcollectionRef = collection(parentDocRef, 'allComment');
 
     const messageData = {
       value: comment,
-      date: Date().toLocaleString(),
+      date: new Date().toLocaleString(),
       name: email,
-
     };
 
     await setDoc(doc(subcollectionRef), messageData);
-    
-    
-    
 
-  }
+    if (comment !== '') {
+      if (showDiv && !showBeforeDiv) {
+        setShowBeforeDiv(true);
+        setShowDiv(false);
+      } else {
+        setShowBeforeDiv(false);
+        setShowDiv(true);
+      }
+    }
+  };
+
+  const handleLike = async () => {
+    const auth = getAuth();
+    const user = auth.currentUser;
+
+    if (user !== null) {
+      // Toggle the like status
+      const isCurrentlyLiked = isLiked;
+      setIsLiked(!isLiked);
+
+      // Create or delete the like document in Firestore
+      if (isCurrentlyLiked) {
+        await deleteDoc(doc(firestore, 'likes', pId, 'like', `${pId}-${user.email}`));
+        setLikeCount(count => count - 1);
+      } else {
+        await setDoc(doc(firestore, 'likes', pId, 'like', `${pId}-${user.email}`), {
+          email: user.email,
+        });
+        setLikeCount(count => count + 1);
+      }
+    } else {
+      alert('You must be logged in to like this post.');
+    }
+  };
+
+  useEffect(() => {
+    countLikes();
+
+    return () => { };
+  }, []);
+
+  const countLikes = async () => {
+    const collectionRef = collection(firestore, 'likes', pId, 'like');
+
+    try {
+      const querySnapshot = await getDoc(collectionRef);
+      const totalSize = querySnapshot.docs.length;
+      setLikeCount(totalSize);
+    } catch (error) {
+      console.error('Count likes', error);
+    }
+  };
+
 
 
   return (
     <>
-      <div style={{ display: 'flex', overflow: 'scroll initial' }}>
-        <Sidebar />
-        <div style={{ display: 'grid', marginLeft: '5px', overflow: 'scroll initial', width: '40%' }}>
-          {console.log("frame = " + name + image + price)}
-          {
-            <Frame
-              name={info.name}
-              price={info.price}
-              image={info.image}
-              details={info.details}
-            />
-
-          }
-
+      <CustomNavbar />
+      <div className="card" style={{ marginBottom: '20px' }}>
+        <div className="card">
+          <Frame
+            name={info.name}
+            price={info.price}
+            image={info.image}
+            details={info.details}
+            like={info.like}
+          />
+          <div className="d-flex align-items-center" style={{ margin: '10px' }}>
+            <button className={`btn btn-primary ${isLiked ? 'liked' : ''}`} onClick={handleLike}>
+              {isLiked ? 'Unlike' : 'Like'}
+            </button>
+            <span style={{ display: 'flex', justifyContent: 'center', justifyItems: 'center', height: '50px', width: '70px', backgroundColor: 'yellow', margin: '30px', fontSize: '20px' }}>{likeCount} likes</span>
+          </div>
         </div>
-        <div style={{ border: '2px solid black', width: '40%', marginLeft: '1s%', }}>
-          <div className='card' style={{ width: '98%', border: '2px solid black', margin: '5px' }}>
-            <textarea value={comment} onChange={evt => setComment(evt.target.value)} />
-          </div>
-          <button onClick={bttnClick}>Comment</button>
-          {showDiv && 
-          <div className='' style={{
-            border:'1px solid black', 
-            backgroundColor:'powderblue', height:'7%',justifyContent:'right',marginLeft:'2%'}}>
-          <p>{cmtName}</p>
-          <p>{comment}</p>
-          <p>{Date().toLocaleString()}</p>
-          </div>
-          }
-          <Comment pId = {pId}/>
+        <div className="card">
+          <textarea
+            value={comment}
+            onChange={evt => setComment(evt.target.value)}
+            className="form-control"
+            rows="3"
+            placeholder="Write a comment..."
+          ></textarea>
+          <button className="btn btn-primary mt-2" onClick={handleCommentSubmit}>
+            Comment
+          </button>
+          {showDiv && <Comment pId={pId} />}
+          {showBeforeDiv && <Comment pId={pId} />}
         </div>
       </div>
+      <Footer />
+      <style>
+        {`
+          .liked {
+            background-color: red;
+            color: white;
+          }
 
+          .frame-container {
+            display: flex;
+            align-items: center;
+            
+          }
+
+          .product-image {
+            width: 200px;
+            height: 200px;
+            margin-right: 1.5rem;
+          }
+
+          .product-details {
+            flex: 1;
+          }
+
+          .product-name {
+            color: #007185;
+            font-size: 24px;
+            margin-bottom: 0;
+          }
+
+          .product-price {
+            color: #008000;
+            font-size: 20px;
+          }
+
+          .product-description {
+            text-align: justify;
+            margin-bottom: 1rem;
+          }
+
+          .add-to-cart-button {
+            padding: 0.5rem 1rem;
+            font-size: 16px;
+          }
+        `}
+      </style>
     </>
   );
-}
+};
 
-
-const Frame = ({ name, price, image, details }) => {
-  const navigate = useNavigate();
-  console.log("frame = " + name + " " + image + " " + price + " " + details);
-  const btnClick = async () => {
+const Frame = ({ name, price, image, details, like }) => {
+  const [showMessage, setShowMessage] = useState(false);
+  const handleAddToCart = async () => {
     const auth = getAuth();
     const user = auth.currentUser;
-    if (user !== null) {
-      // The user object has basic properties such as display name, email, etc.
-      const displayName = user.displayName;
-      const email = user.email;
-      const photoURL = user.photoURL;
-      const emailVerified = user.emailVerified;
 
-      // The user's ID, unique to the Firebase project. Do NOT use
-      // this value to authenticate with your backend server, if
-      // you have one. Use User.getToken() instead.
-      const uid = user.uid;
-      let quantity = 1;
-      console.log(email);
-      await setDoc(doc(firestore, "add-to-cart", email, "products", pId), {
+    if (user !== null) {
+      const email = user.email;
+      const quantity = 1;
+
+      await setDoc(doc(firestore, 'add-to-cart', email, 'products', pId), {
         name: name,
         price: price,
         image: image,
-        quantity: 1,
-        totalPrice: quantity * price
+        details: details,
+        Quantity: 1,
+        totalPrice: price,
       });
+      setShowMessage(true);
     }
-  }
+  };
+
   return (
-    <>
-      <div className='card row' >
-        <div className='col'>
-          <div className="center" >
-            <img className='' src={image} alt="image product" style={{ width: '100%' }} />
-            <p className='' style={{ color: "blue", fontSize: '30px' }}>Name : {name}</p>
-            <p className='' style={{ color: 'green', fontSize: '40px' }}>Price : {price}</p>
-          </div>
-          <div>
-            <p className='text-justify' style={{ fontFamily: 'cursive' }}>{details}</p>
-          </div>
-          <div className='btn btn-dark'>
-            <button type='submit' onClick={btnClick} className='btn btn-dark' style={{ alignContent: 'center' }}><p style={{ fontSize: '20px' }}>Add to Cart</p></button>
-          </div>
-
-        </div>
-
+    <div className="frame-container">
+      <img className="product-image" src={image} alt="product" style={{ height: '500px', width: '450px' }} />
+      <div className="product-details">
+        <h2 className="product-name">{name}</h2>
+        <h3 className="product-price">Price: {price}</h3>
+        <p className="product-description">{details}</p>
+        <button className="btn btn-primary add-to-cart-button" type="submit" onClick={handleAddToCart}>
+          Add to Cart
+        </button>
+        {showMessage && <p style={{ fontSize: '30px' }}>Product added to cart!</p>}
       </div>
-
-    </>
-
+    </div>
   );
+};
 
-}
-
-export default ProductDetails
+export default ProductDetails;
