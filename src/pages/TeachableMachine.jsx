@@ -77,7 +77,7 @@ function TeachableMachine() {
         }}>Predict</button>
         </div>
         
-        {predictions.length > 0 && (
+        {predictions.length > 0 ? (
           <div style={{fontSize: '20px', fontWeight:'bold', display:'grid', justifyContent:'center' }}>
             
               <ul>
@@ -88,7 +88,7 @@ function TeachableMachine() {
               </ul>
             
           </div>
-        )}
+        ):<div></div>}
       </div>
 
       

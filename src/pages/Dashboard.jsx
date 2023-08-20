@@ -8,6 +8,7 @@ import backgroundImage from '../jason-leung-Xaanw0s0pMk-unsplash.jpg';
 import { useCollectionData } from 'react-firebase-hooks/firestore';
 import CustomNavbar from './CustomNavbar';
 
+
 import {
   getFirestore,
   collection,
@@ -37,9 +38,7 @@ import Iframee from './Iframee';
 
 //import './read.css';
 
-const myStyle = {
-  width: "5 rem"
-};
+
 
 const Dashboard = () => {
   const location = useLocation();
@@ -184,6 +183,7 @@ const Dashboard = () => {
         <div style={{ marginTop: '15px', marginBottom: '10px' }}>
           <Iframee />
         </div>
+        
         <Footer />
 
       </div>

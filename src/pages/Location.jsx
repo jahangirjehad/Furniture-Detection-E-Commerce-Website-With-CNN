@@ -1,9 +1,24 @@
 import React from "react";
 import GoogleMapReact from 'google-map-react';
 
-const AnyReactComponent = ({ text }) => <div>{text}</div>;
+// Define the custom marker component
+const AnyReactComponent = ({ text }) => (
+  <div style={{
+    color: 'white',
+    background: 'red',
+    padding: '5px 10px',
+    display: 'inline-flex',
+    textAlign: 'center',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: '50%',
+    transform: 'translate(-50%, -50%)'
+  }}>
+    {text}
+  </div>
+);
 
-export default function Location(){
+export default function Location() {
   const defaultProps = {
     center: {
       lat: 10.99835602,
@@ -20,9 +35,10 @@ export default function Location(){
         defaultCenter={defaultProps.center}
         defaultZoom={defaultProps.zoom}
       >
+        {/* Use the custom marker component */}
         <AnyReactComponent
-          lat={59.955413}
-          lng={30.337844}
+          lat={10.99835602}
+          lng={77.01502627}
           text="My Marker"
         />
       </GoogleMapReact>
